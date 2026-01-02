@@ -1,0 +1,295 @@
+// TVOJ DISCORD ID
+const DISCORD_ID = "592669287743881217"; 
+
+document.addEventListener('DOMContentLoaded', () => {
+    const startScreen = document.getElementById('start-screen');
+    const mainContent = document.getElementById('main-content');
+    const audio = document.getElementById('audio-player');
+    const volumeSlider = document.getElementById('volume-slider');
+    const zvucnikDugme = document.getElementById('zvucnik');
+
+    // Elementi za Muzički Widget
+    const widgetPlayBtn = document.getElementById('widget-play-btn');
+    const musicProgress = document.getElementById('music-progress');
+    const currentSongTime = document.getElementById('current-song-time');
+    const songDuration = document.getElementById('song-duration');
+    const playIconPath = "M8 5v14l11-7z";
+    const pauseIconPath = "M6 19h4V5H6v14zm8-14v14h4V5h-4z";
+
+    const avatarImg = document.getElementById('discord-avatar');
+    const statusIndicator = document.getElementById('status-indicator');
+    const usernameText = document.getElementById('discord-username');
+    const statusText = document.getElementById('discord-status-text');
+
+    // --- SNEG EFEKAT ---
+    function createSnow() {
+        const snowContainer = document.getElementById('snow-container');
+        if(!snowContainer) return; 
+        
+        const numberOfSnowflakes = 40; 
+        for (let i = 0; i < numberOfSnowflakes; i++) {
+            const snowflake = document.createElement('div');
+            snowflake.classList.add('snowflake');
+            snowflake.style.left = Math.random() * 100 + 'vw';
+            const size = Math.random() * 3 + 2 + 'px';
+            snowflake.style.width = size;
+            snowflake.style.height = size;
+            snowflake.style.animationDuration = Math.random() * 10 + 5 + 's';
+            snowflake.style.animationDelay = Math.random() * 5 + 's';
+            snowflake.style.opacity = Math.random() * 0.5 + 0.3;
+            snowContainer.appendChild(snowflake);
+        }
+    }
+    createSnow();
+
+    // POSTAVKA ZVUKA (Inicijalno)
+    if(audio && volumeSlider) {
+        audio.volume = parseFloat(volumeSlider.value);
+    }
+
+    // --- 1. KLIK NA EKRAN (POČETAK) ---
+    if(startScreen) {
+        const startEvent = (e) => {
+            e.preventDefault(); 
+            startScreen.style.opacity = '0';
+            setTimeout(() => { startScreen.style.display = 'none'; }, 800);
+            if(mainContent) mainContent.style.opacity = '1';
+            
+            if(audio) {
+                audio.play().then(() => {
+                    updatePlayIcon(true);
+                }).catch(err => console.log("Audio autoplay block:", err));
+            }
+        };
+
+        startScreen.addEventListener('click', () => {
+             startScreen.style.opacity = '0';
+            setTimeout(() => { startScreen.style.display = 'none'; }, 800);
+            if(mainContent) mainContent.style.opacity = '1';
+            if(audio) {
+                audio.play().then(() => {
+                    updatePlayIcon(true);
+                }).catch(err => console.log("Autoplay:", err));
+            }
+        });
+    }
+
+    // --- 2. LOGIKA ZA MUZIČKI WIDGET ---
+    function updatePlayIcon(isPlaying) {
+        if(!widgetPlayBtn) return;
+        const svgPath = widgetPlayBtn.querySelector('path');
+        if(isPlaying) {
+            svgPath.setAttribute('d', pauseIconPath);
+        } else {
+            svgPath.setAttribute('d', playIconPath);
+        }
+    }
+
+    if(widgetPlayBtn) {
+        widgetPlayBtn.addEventListener('click', () => {
+            if(audio.paused) {
+                audio.play();
+                updatePlayIcon(true);
+            } else {
+                audio.pause();
+                updatePlayIcon(false);
+            }
+        });
+    }
+
+    function formatTime(seconds) {
+        const min = Math.floor(seconds / 60);
+        const sec = Math.floor(seconds % 60);
+        return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+    }
+
+    if(audio) {
+        audio.addEventListener('timeupdate', () => {
+            if(musicProgress) {
+                if(document.activeElement !== musicProgress) {
+                    musicProgress.value = audio.currentTime;
+                }
+                
+                if(!isNaN(audio.duration)) {
+                    musicProgress.max = audio.duration;
+                    if(songDuration) songDuration.innerText = formatTime(audio.duration);
+                }
+            }
+            if(currentSongTime) currentSongTime.innerText = formatTime(audio.currentTime);
+        });
+
+        audio.addEventListener('loadedmetadata', () => {
+            if(musicProgress) musicProgress.max = audio.duration;
+            if(songDuration) songDuration.innerText = formatTime(audio.duration);
+        });
+
+        if(musicProgress) {
+            musicProgress.addEventListener('input', () => {
+                audio.currentTime = musicProgress.value;
+            });
+            musicProgress.addEventListener('change', () => {
+                audio.currentTime = musicProgress.value;
+            });
+        }
+    }
+
+    // --- 3. CRYPTO PRICES LOGIKA ---
+    async function updateCryptoPrices() {
+        try {
+            const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,litecoin,usd-coin&vs_currencies=usd&include_24hr_change=true');
+            const data = await response.json();
+
+            const updateCoin = (id, jsonId) => {
+                const priceEl = document.getElementById(`price-${id}`);
+                const changeEl = document.getElementById(`change-${id}`);
+                
+                if (data[jsonId]) {
+                    const price = data[jsonId].usd;
+                    const change = data[jsonId].usd_24h_change.toFixed(2);
+                    const formattedPrice = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(price);
+                    
+                    if(priceEl) priceEl.innerText = formattedPrice;
+                    
+                    if(changeEl) {
+                        changeEl.innerText = (change > 0 ? '+' : '') + change + '%';
+                        changeEl.className = 'coin-change'; 
+                        changeEl.classList.add(change >= 0 ? 'change-positive' : 'change-negative');
+                    }
+                }
+            };
+
+            updateCoin('bitcoin', 'bitcoin');
+            updateCoin('ethereum', 'ethereum');
+            updateCoin('solana', 'solana');
+            updateCoin('litecoin', 'litecoin');
+            updateCoin('usd-coin', 'usd-coin');
+
+        } catch (error) {
+            console.error("Greška sa kripto cenama:", error);
+        }
+    }
+
+    // --- 4. GLAVNA KONTROLA ZVUKA ---
+    if(zvucnikDugme) {
+        zvucnikDugme.addEventListener('click', () => {
+            if (audio.muted || audio.volume === 0) {
+                audio.muted = false;
+                if(audio.volume === 0) {
+                    audio.volume = 0.5;
+                    if(volumeSlider) volumeSlider.value = 0.5;
+                }
+                zvucnikDugme.style.opacity = "1";
+            } else {
+                audio.muted = true;
+                zvucnikDugme.style.opacity = "0.3";
+            }
+        });
+    }
+
+    if(volumeSlider) {
+        const changeVolume = () => {
+            const val = parseFloat(volumeSlider.value);
+            audio.volume = val; 
+            
+            if(val > 0 && audio.muted) {
+                audio.muted = false;
+                if(zvucnikDugme) zvucnikDugme.style.opacity = "1";
+            }
+            if(val === 0) {
+                if(zvucnikDugme) zvucnikDugme.style.opacity = "0.3";
+            }
+        };
+
+        volumeSlider.addEventListener('input', changeVolume);
+        volumeSlider.addEventListener('change', changeVolume);
+        
+        volumeSlider.addEventListener('touchmove', (e) => {
+            e.stopPropagation(); 
+        }, {passive: true});
+    }
+
+    // --- 5. DISCORD STATUS ---
+    async function updateDiscordStatus() {
+        try {
+            const response = await fetch(`https://api.lanyard.rest/v1/users/${DISCORD_ID}`);
+            const json = await response.json();
+
+            if (json.success) {
+                const data = json.data;
+                const user = data.discord_user;
+
+                if(usernameText) usernameText.innerText = user.username;
+
+                if(avatarImg) {
+                    let avatarUrl = "default.jpg";
+                    if (user.avatar) {
+                        const extension = user.avatar.startsWith("a_") ? "gif" : "png";
+                        avatarUrl = `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.${extension}?size=512`;
+                    }
+                    avatarImg.src = avatarUrl;
+                    
+                    const status = data.discord_status;
+                    avatarImg.className = ''; 
+                    if(statusIndicator) statusIndicator.className = '';
+
+                    switch(status) {
+                        case 'online': avatarImg.classList.add('online-border'); statusIndicator.classList.add('online-bg'); break;
+                        case 'idle': avatarImg.classList.add('idle-border'); statusIndicator.classList.add('idle-bg'); break;
+                        case 'dnd': avatarImg.classList.add('dnd-border'); statusIndicator.classList.add('dnd-bg'); break;
+                        default: avatarImg.classList.add('offline-border'); statusIndicator.classList.add('offline-bg');
+                    }
+                }
+
+                if(statusText) {
+                    let activityText = "Chilling";
+                    const activity = data.activities.find(a => a.type === 0);
+                    const spotify = data.listening_to_spotify;
+                    const custom = data.activities.find(a => a.type === 4);
+
+                    if (activity) {
+                        activityText = `Playing: ${activity.name}`;
+                        if(activity.details) activityText += `\n${activity.details}`;
+                    } else if (spotify) {
+                        activityText = `Listening to: ${data.spotify.song}`;
+                    } else if (custom && custom.state) {
+                        activityText = custom.state;
+                    } else {
+                        if(status === 'online') activityText = "Online";
+                        if(status === 'dnd') activityText = "Do Not Disturb";
+                        if(status === 'idle') activityText = "AFK";
+                        if(status === 'offline') activityText = "Offline";
+                    }
+                    statusText.innerText = activityText;
+                }
+            }
+        } catch (error) {
+            console.error(error);
+            if(statusText) statusText.innerText = "Offline";
+        }
+    }
+
+    // POKRETANJE SVEGA
+    updateDiscordStatus();
+    setInterval(updateDiscordStatus, 5000);
+
+    updateCryptoPrices();
+    setInterval(updateCryptoPrices, 60000);
+});
+
+// --- KOPIRANJE ADRESA ---
+window.copyCrypto = function(address, element) {
+    navigator.clipboard.writeText(address).then(() => {
+        const statusSpan = element.querySelector('.crypto-status');
+        const originalText = statusSpan.innerText;
+        
+        element.classList.add('copied-success');
+        statusSpan.innerText = "COPIED!";
+        
+        setTimeout(() => {
+            element.classList.remove('copied-success');
+            statusSpan.innerText = originalText;
+        }, 2000);
+    }).catch(err => {
+        console.error('Failed to copy: ', err);
+    });
+}
